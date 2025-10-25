@@ -15,7 +15,7 @@ import java.util.concurrent.Executors;
 
 public class Server {
     private final int PORT;
-    private final int NUMBER_THREADS=64;
+    private final int NUMBER_THREADS = 64;
     private final ExecutorService executorService = Executors.newFixedThreadPool(NUMBER_THREADS);
     private final Map<String, Map<String, Handler>> handlers = new ConcurrentHashMap<>();
 
@@ -41,7 +41,8 @@ public class Server {
              final var in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              final var out = new BufferedOutputStream(socket.getOutputStream());) {
 
-            final var requestLine = in.readLine();
+
+            final var requestLine = in.readLine();   // читаем до первого \r\n
 
             if (requestLine == null) {
                 sendResponse(out, "400 Bad Request");
@@ -49,8 +50,6 @@ public class Server {
             }
 
             final var parts = requestLine.split(" ");
-
-
             if (parts.length != 3) {
                 sendResponse(out, "400 Bad Request");
                 return;
@@ -58,20 +57,32 @@ public class Server {
 
             final var method = parts[0];
             final var fullPath = parts[1];
+            final var protocolVerse = parts[2];
+
+            //проверяем на наличие /
+            if (!fullPath.startsWith("/")) {
+                sendResponse(out, "400 Bad Request");
+                return;
+            }
+
             // Извлекаем чистый путь без query-параметров
-            String cleanPath;
+            String cleanPath = fullPath;
             int queryStart = fullPath.indexOf('?');
             if (queryStart != -1) {
                 cleanPath = fullPath.substring(0, queryStart);
-            } else {
-                cleanPath = fullPath;
             }
-            final var protocolVerse = parts[2];
 
+            // --- Чтение заголовков ---
+//читаем по одной строке до тех пор, пока не попадется пустая строка
+//сохраняем в список.
+//
+            // --- Чтение тела запроса ---
+//читаем тело запроса одной строкой?
+            // --- Создание Request ---
+//добавляем полученные значения headers и body
             var request = new Request(method, fullPath, protocolVerse, null, null);
 
-            //поиск handler - возврат пустой мапы в случае если метода нет,
-            // возврат null если нет совпадений по path
+            // --- Поиск хендлера по чистому пути ---
             Handler handler = handlers.getOrDefault(method, Collections.emptyMap())
                     .get(cleanPath);
             if (handler == null) {
@@ -80,10 +91,10 @@ public class Server {
             }
             try {
                 handler.handle(request, out);
-                //если ошибка будет в логике у пользователя, то делаем перехват
             } catch (Exception ex) {
                 sendResponse(out, "500 Internet server error");
             }
+
         } catch (IOException e) {
             e.printStackTrace();
         }

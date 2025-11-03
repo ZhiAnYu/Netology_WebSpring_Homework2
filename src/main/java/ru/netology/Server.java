@@ -1,9 +1,6 @@
 package ru.netology;
 
-import java.io.BufferedOutputStream;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Collections;
@@ -38,49 +35,33 @@ public class Server {
 
     private void handleConnection(Socket socket) {
         try (socket;
-             final var in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             final var in = new BufferedInputStream(socket.getInputStream());
              final var out = new BufferedOutputStream(socket.getOutputStream());) {
 
+            final var limit = 4096;
 
-            final var requestLine = in.readLine();   // читаем до первого \r\n
+            in.mark(limit);
+            final var buffer = new byte[limit];
+            final var read = in.read(buffer);
 
-            if (requestLine == null) {
+           final var parser = new QueryStringParserImpl();
+            parser.parseRequestLine(buffer, read);
+            if (parser.badRequest == true) {
                 sendResponse(out, "400 Bad Request");
-                return;
             }
 
-            final var parts = requestLine.split(" ");
-            if (parts.length != 3) {
-                sendResponse(out, "400 Bad Request");
-                return;
-            }
+            parser.parseHeaders(buffer, read);
 
-            final var method = parts[0];
-            final var fullPath = parts[1];
-            final var protocolVerse = parts[2];
+            final var method = parser.getMethod();
+            final var fullPath = parser.getFullPath();
+            final var protocolVerse = parser.getProtocolVerse();
+            final var cleanPath = parser.getCleanPath();
+            final var headers = parser.getHeaders();
+            final  var body = (method.equals("POST"))?parser.getBody():"0";
 
-            //проверяем на наличие /
-            if (!fullPath.startsWith("/")) {
-                sendResponse(out, "400 Bad Request");
-                return;
-            }
 
-            // Извлекаем чистый путь без query-параметров
-            String cleanPath = fullPath;
-            int queryStart = fullPath.indexOf('?');
-            if (queryStart != -1) {
-                cleanPath = fullPath.substring(0, queryStart);
-            }
 
-            // --- Чтение заголовков ---
-//читаем по одной строке до тех пор, пока не попадется пустая строка
-//сохраняем в список.
-//
-            // --- Чтение тела запроса ---
-//читаем тело запроса одной строкой?
-            // --- Создание Request ---
-//добавляем полученные значения headers и body
-            var request = new Request(method, fullPath, protocolVerse, null, null);
+            var request = new Request(method, fullPath, protocolVerse, headers, body);
 
             // --- Поиск хендлера по чистому пути ---
             Handler handler = handlers.getOrDefault(method, Collections.emptyMap())
@@ -100,16 +81,14 @@ public class Server {
         }
     }
 
-    private void sendResponse(BufferedOutputStream out, String status) {
-        try {
-            String response = "HTTP/1.1 " + status + "\r\n" +
-                    "Content-Length: 0" + "\r\n" +
-                    "Connection: close\r\n\r\n";
-            out.write(response.getBytes());
-            out.flush();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    private static void sendResponse(BufferedOutputStream out, String status) throws IOException {
+        out.write((
+                "HTTP/1.1" + status + "\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "Connection: close\r\n" +
+                        "\r\n"
+        ).getBytes());
+        out.flush();
     }
 
     public void addHandler(String method, String path, Handler handler) {

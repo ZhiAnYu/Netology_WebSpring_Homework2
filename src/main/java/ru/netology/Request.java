@@ -8,7 +8,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
-public record Request(String method, String path, String protocolVerse, String[] headersRequest, byte[] bodyRequest) {
+public record Request(
+        String method,
+        String path,
+        String protocolVerse,
+        List<String> headersRequest,
+        String bodyRequest) {
 
     public List<NameValuePair> getQueryParam(String name) {
 //фильтрация по имени в момент запроса

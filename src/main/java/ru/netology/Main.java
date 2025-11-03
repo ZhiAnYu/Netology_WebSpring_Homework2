@@ -30,6 +30,25 @@ public class Main {
             }
         });
 
+        server.addHandler("POST", "/submit", (Request request, BufferedOutputStream out) -> {
+            var responce = request.getPostParams();
+
+            try {
+                out.write((
+                        "HTTP/1.1 200 OK\r\n" +
+                                "Content-Type: text/plain\r\n" +
+                                "Content-Length: " + request.queryStringGetBytes(responce).length + "\r\n" +
+                                "Connection: close\r\n" +
+                                "\r\n"
+                ).getBytes());
+                out.write(request.queryStringGetBytes(responce));
+                out.flush();
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+
 
         server.listen();
     }

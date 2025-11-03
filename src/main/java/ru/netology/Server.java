@@ -3,6 +3,7 @@ package ru.netology;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,19 +46,35 @@ public class Server {
             final var read = in.read(buffer);
 
            final var parser = new QueryStringParserImpl();
+
             parser.parseRequestLine(buffer, read);
-            if (parser.badRequest == true) {
+            if (parser.badRequest) {
                 sendResponse(out, "400 Bad Request");
             }
 
             parser.parseHeaders(buffer, read);
+            if (parser.badRequest) {
+                sendResponse(out, "400 Bad Request");
+                return;
+            }
+
+
+            // Парсим тело, если нужно
+            if ("POST".equals(parser.getMethod())) {
+                parser.parseBody(buffer);
+                if (parser.badRequest) {
+                    sendResponse(out, "400 Bad Request");
+                    return;
+                }
+            }
 
             final var method = parser.getMethod();
             final var fullPath = parser.getFullPath();
             final var protocolVerse = parser.getProtocolVerse();
             final var cleanPath = parser.getCleanPath();
             final var headers = parser.getHeaders();
-            final  var body = (method.equals("POST"))?parser.getBody():"0";
+            final var body = parser.getBody();
+
 
 
 
@@ -81,13 +98,15 @@ public class Server {
         }
     }
 
+
+
     private static void sendResponse(BufferedOutputStream out, String status) throws IOException {
         out.write((
-                "HTTP/1.1" + status + "\r\n" +
+                "HTTP/1.1 " + status + "\r\n" +
                         "Content-Length: 0\r\n" +
                         "Connection: close\r\n" +
                         "\r\n"
-        ).getBytes());
+        ).getBytes(StandardCharsets.UTF_8));
         out.flush();
     }
 

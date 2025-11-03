@@ -6,14 +6,15 @@ import org.apache.http.client.utils.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public record Request(
         String method,
         String path,
         String protocolVerse,
-        List<String> headersRequest,
-        String bodyRequest) {
+        Map<String, String> headers,
+        String body) {
 
     public List<NameValuePair> getQueryParam(String name) {
 //фильтрация по имени в момент запроса
@@ -47,9 +48,28 @@ public record Request(
 
     }
 
+    public List<NameValuePair> getPostParams() {
+        String contentType = headers.get("content-type");
+        if (body == null || body.isEmpty() ||
+                contentType == null ||
+                !contentType.startsWith("application/x-www-form-urlencoded")) {
+            return Collections.emptyList();
+        }
+        return URLEncodedUtils.parse(body, StandardCharsets.UTF_8);
+    }
+
+    public String getPostParamValue(String name) {
+        return getPostParams().stream()
+                .filter(p -> name.equals(p.getName()))
+                .map(NameValuePair::getValue)
+                .findFirst()
+                .orElse(null);
+    }
     public byte[] queryStringGetBytes(List<NameValuePair> params) {
         return URLEncodedUtils
                 .format(params, StandardCharsets.UTF_8)
                 .getBytes(StandardCharsets.UTF_8);
     }
+
+
 }

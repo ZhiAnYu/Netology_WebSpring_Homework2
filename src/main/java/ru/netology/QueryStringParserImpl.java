@@ -2,18 +2,22 @@ package ru.netology;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.LinkedHashMap;
 
 public class QueryStringParserImpl implements QueryStringParser {
-    private static String fullPath;
-    private static String method;
-    private static String protocolVerse;
-    private static String cleanPath;
-    private List<String> headers;
+    private String fullPath;
+    private String method;
+    private String protocolVerse;
+    private String cleanPath;
+    private Map<String, String> headers;
     private String body;
-    public static boolean badRequest = false;
+    public boolean badRequest = false;
     static final List<String> allowedMethods = List.of("GET", "POST");
     private int headersStart;
     private int headersEnd;
@@ -80,7 +84,20 @@ public class QueryStringParserImpl implements QueryStringParser {
 
         ByteArrayInputStream bis = new ByteArrayInputStream(buffer);
         final var headersBytes = bis.readNBytes(headersEnd - headersStart);
-        final var headers = Arrays.asList(new String(headersBytes).split("\r\n"));
+//        byte[] headersBytes = Arrays.copyOfRange(buffer, headersStart, headersEnd);
+        String headersStr = new String(headersBytes, StandardCharsets.UTF_8);
+        List<String> headerLines = Arrays.asList(headersStr.split("\r\n"));
+
+        this.headers = headerLines.stream()
+                .filter(line -> line.contains(":"))
+                .collect(Collectors.toMap(
+                        line -> line.substring(0, line.indexOf(':')).trim().toLowerCase(),
+                        line -> line.substring(line.indexOf(':') + 1).trim(),
+                        (oldVal, newVal) -> newVal, // последнее значение побеждает
+                        LinkedHashMap::new
+                ));
+
+//        final var headers = Arrays.asList(new String(headersBytes).split("\r\n"));
 //        System.out.println(headers);
     }
 
@@ -102,12 +119,9 @@ public class QueryStringParserImpl implements QueryStringParser {
 
     }
 
-    private static Optional<String> extractHeader(List<String> headers, String header) {
-        return headers.stream()
-                .filter(o -> o.startsWith(header))
-                .map(o -> o.substring(o.indexOf(" ")))
-                .map(String::trim)
-                .findFirst();
+    private Optional<String> extractHeader(Map<String, String> headers, String headerName) {
+        String value = headers.get(headerName.toLowerCase());
+        return Optional.ofNullable(value);
     }
 
     private static int indexOf(byte[] array, byte[] target, int start, int max) {
@@ -123,27 +137,29 @@ public class QueryStringParserImpl implements QueryStringParser {
         return -1;
     }
 
-    public static String getMethod() {
+    public String getMethod() {
         return method;
     }
 
-    public static String getFullPath() {
+    public String getFullPath() {
         return fullPath;
     }
 
-    public static String getProtocolVerse() {
+    public String getProtocolVerse() {
         return protocolVerse;
     }
 
-    public static String getCleanPath() {
+    public String getCleanPath() {
         return cleanPath;
     }
 
-    public List<String> getHeaders() {
+    public Map<String, String> getHeaders() {
         return headers;
     }
 
     public String getBody() {
         return body;
     }
+
+
 }
